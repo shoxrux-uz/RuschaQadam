@@ -1,0 +1,62 @@
+name: APK yasash
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodni olish
+        uses: actions/checkout@v4
+
+      - name: Node.js o'rnatish (testlar uchun)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Avtomatik testlar (QA)
+        run: |
+          npm install --no-save --no-package-lock jsdom@24
+          # run-tests.js faylini repo ichida qayerda bo'lsa ham topamiz
+          TESTFILE=$(find . -name 'run-tests.js' -type f -not -path './node_modules/*' | head -n 1)
+          if [ -z "$TESTFILE" ]; then echo "run-tests.js topilmadi — uni GitHub'ga yuklang"; exit 1; fi
+          echo "Test fayli: $TESTFILE"
+          mkdir -p .qa && cp "$TESTFILE" .qa/run-tests.js
+          node .qa/run-tests.js
+
+      - name: Java 17 o'rnatish
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle o'rnatish
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: APK yig'ish
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Faylga nom berish
+        run: cp app/build/outputs/apk/debug/app-debug.apk RuschaQadam.apk
+
+      - name: APK ni saqlash
+        uses: actions/upload-artifact@v4
+        with:
+          name: RuschaQadam-APK
+          path: RuschaQadam.apk
+
+      - name: Release sahifasiga joylash
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: Ruscha Qadam v1.${{ github.run_number }}
+          body: "Telefonga o'rnatish uchun pastdagi RuschaQadam.apk faylini yuklab oling."
+          files: RuschaQadam.apk
