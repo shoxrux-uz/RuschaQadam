@@ -15,6 +15,15 @@ jobs:
       - name: Kodni olish
         uses: actions/checkout@v4
 
+      - name: Loyiha papkasini topish
+        run: |
+          # settings.gradle qaysi papkada bo'lsa — loyiha o'sha yerda (ichma-ich papkalar bo'lsa ham ishlaydi)
+          F=$(find . -name 'settings.gradle' -type f -not -path './.git/*' | head -n 1)
+          if [ -z "$F" ]; then echo "settings.gradle topilmadi — loyiha fayllarini yuklang"; exit 1; fi
+          P=$(dirname "$F")
+          echo "Loyiha papkasi: $P"
+          echo "PROJ=$P" >> "$GITHUB_ENV"
+
       - name: Node.js o'rnatish (testlar uchun)
         uses: actions/setup-node@v4
         with:
@@ -22,13 +31,9 @@ jobs:
 
       - name: Avtomatik testlar (QA)
         run: |
+          cd "$PROJ"
           npm install --no-save --no-package-lock jsdom@24
-          # run-tests.js faylini repo ichida qayerda bo'lsa ham topamiz
-          TESTFILE=$(find . -name 'run-tests.js' -type f -not -path './node_modules/*' | head -n 1)
-          if [ -z "$TESTFILE" ]; then echo "run-tests.js topilmadi — uni GitHub'ga yuklang"; exit 1; fi
-          echo "Test fayli: $TESTFILE"
-          mkdir -p .qa && cp "$TESTFILE" .qa/run-tests.js
-          node .qa/run-tests.js
+          node tests/run-tests.js
 
       - name: Java 17 o'rnatish
         uses: actions/setup-java@v4
@@ -42,10 +47,12 @@ jobs:
           gradle-version: '8.9'
 
       - name: APK yig'ish
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: |
+          cd "$PROJ"
+          gradle assembleDebug --no-daemon --stacktrace
 
       - name: Faylga nom berish
-        run: cp app/build/outputs/apk/debug/app-debug.apk RuschaQadam.apk
+        run: cp "$PROJ/app/build/outputs/apk/debug/app-debug.apk" RuschaQadam.apk
 
       - name: APK ni saqlash
         uses: actions/upload-artifact@v4
